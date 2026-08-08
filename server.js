@@ -11,6 +11,14 @@ if (ffmpegPath) {
 const app = express();
 app.use(cors());
 
+// Initialize ytdl-core agent to bypass YouTube bot detection
+let agent;
+try {
+    agent = ytdl.createAgent();
+} catch (e) {
+    console.error('Agent creation error:', e.message);
+}
+
 app.get('/', (req, res) => {
     res.json({ status: 'online', message: 'Emojora Clip Downloader Microservice API' });
 });
@@ -28,21 +36,16 @@ app.get('/api/clip', async (req, res) => {
     try {
         const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
         
-        // Fetch info using ytdl-core
-        const info = await ytdl.getInfo(videoUrl);
+        // Fetch info using ytdl-core with agent
+        const options = agent ? { agent } : {};
+        const info = await ytdl.getInfo(videoUrl, options);
         
-        // Find best combined MP4 format
         let format = ytdl.chooseFormat(info.formats, { quality: 'highest', filter: 'audioandvideo' });
         if (!format || !format.url) {
-            format = info.formats.find(f => f.hasVideo && f.hasAudio && f.url);
+            format = info.formats.find(f => f.url);
         }
 
         if (!format || !format.url) {
-            // Fallback: If combined audio+video format is not available, stream direct URL
-            const highestFormat = info.formats.find(f => f.url);
-            if (highestFormat && highestFormat.url) {
-                return res.redirect(highestFormat.url);
-            }
             return res.status(404).json({ error: 'No playable video format found' });
         }
 
