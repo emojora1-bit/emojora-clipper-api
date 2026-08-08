@@ -1,3 +1,4 @@
+// Emojora Clipper API Microservice v1.0.5 - App Client Rotation
 const express = require('express');
 const cors = require('cors');
 const ytdl = require('@distube/ytdl-core');
