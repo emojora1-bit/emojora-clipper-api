@@ -28,7 +28,7 @@ app.get('/api/clip', async (req, res) => {
     try {
         const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
         
-        // Fetch info using ytdl-core with IOS & ANDROID app clients (bypasses bot detection)
+        // Fetch info using ytdl-core with IOS & ANDROID app client rotation
         const info = await ytdl.getInfo(videoUrl, {
             client: ['IOS', 'ANDROID']
         });
