@@ -1,5 +1,7 @@
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
 const ytdl = require('@distube/ytdl-core');
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegPath = require('ffmpeg-static');
@@ -10,6 +12,33 @@ if (ffmpegPath) {
 
 const app = express();
 app.use(cors());
+
+// Initialize ytdl-core agent with cookie support
+function getYtdlAgent() {
+    try {
+        let cookies = [];
+        
+        // 1. Try reading from environment variable
+        if (process.env.YOUTUBE_COOKIES) {
+            cookies = JSON.parse(process.env.YOUTUBE_COOKIES);
+        } 
+        // 2. Try reading local cookies.json file if present
+        else if (fs.existsSync(path.join(__dirname, 'cookies.json'))) {
+            const raw = fs.readFileSync(path.join(__dirname, 'cookies.json'), 'utf8');
+            cookies = JSON.parse(raw);
+        }
+        
+        if (cookies && cookies.length > 0) {
+            console.log(`Loaded ${cookies.length} YouTube cookies successfully.`);
+            return ytdl.createAgent(cookies);
+        }
+    } catch (err) {
+        console.error('Error loading cookies:', err.message);
+    }
+    
+    // Default agent fallback
+    return ytdl.createAgent();
+}
 
 app.get('/', (req, res) => {
     res.json({ status: 'online', message: 'Emojora Clip Downloader Microservice API' });
@@ -27,20 +56,10 @@ app.get('/api/clip', async (req, res) => {
 
     try {
         const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-        
-        // Use agent with cookies if provided in environment, or default fallback
-        let agent;
-        try {
-            if (process.env.YOUTUBE_COOKIES) {
-                const cookies = JSON.parse(process.env.YOUTUBE_COOKIES);
-                agent = ytdl.createAgent(cookies);
-            } else {
-                agent = ytdl.createAgent();
-            }
-        } catch (e) {}
+        const agent = getYtdlAgent();
 
         const options = {
-            ...(agent ? { agent } : {}),
+            agent,
             requestOptions: {
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
