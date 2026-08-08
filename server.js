@@ -28,16 +28,28 @@ app.get('/api/clip', async (req, res) => {
     try {
         const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
         
-        // Fetch stream using ytdl-core
-        const stream = ytdl(videoUrl, {
-            quality: 'highest',
-            filter: 'audioandvideo'
-        });
+        // Fetch info using ytdl-core
+        const info = await ytdl.getInfo(videoUrl);
+        
+        // Find best combined MP4 format
+        let format = ytdl.chooseFormat(info.formats, { quality: 'highest', filter: 'audioandvideo' });
+        if (!format || !format.url) {
+            format = info.formats.find(f => f.hasVideo && f.hasAudio && f.url);
+        }
+
+        if (!format || !format.url) {
+            // Fallback: If combined audio+video format is not available, stream direct URL
+            const highestFormat = info.formats.find(f => f.url);
+            if (highestFormat && highestFormat.url) {
+                return res.redirect(highestFormat.url);
+            }
+            return res.status(404).json({ error: 'No playable video format found' });
+        }
 
         res.setHeader('Content-Type', 'video/mp4');
         res.setHeader('Content-Disposition', `attachment; filename="Emojora_Clip_${start}s_${end}s.mp4"`);
 
-        ffmpeg(stream)
+        ffmpeg(format.url)
             .setStartTime(start)
             .setDuration(duration)
             .format('mp4')
@@ -55,9 +67,9 @@ app.get('/api/clip', async (req, res) => {
             .pipe(res, { end: true });
 
     } catch (err) {
-        console.error('Processing error:', err);
+        console.error('Processing error:', err.message);
         if (!res.headersSent) {
-            res.status(500).json({ error: err.message });
+            res.status(500).json({ error: 'Failed to process video: ' + err.message });
         }
     }
 });
