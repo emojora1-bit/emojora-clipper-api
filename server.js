@@ -11,14 +11,6 @@ if (ffmpegPath) {
 const app = express();
 app.use(cors());
 
-// Initialize ytdl-core agent to bypass YouTube bot detection
-let agent;
-try {
-    agent = ytdl.createAgent();
-} catch (e) {
-    console.error('Agent creation error:', e.message);
-}
-
 app.get('/', (req, res) => {
     res.json({ status: 'online', message: 'Emojora Clip Downloader Microservice API' });
 });
@@ -36,8 +28,27 @@ app.get('/api/clip', async (req, res) => {
     try {
         const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
         
-        // Fetch info using ytdl-core with agent
-        const options = agent ? { agent } : {};
+        // Use agent with cookies if provided in environment, or default fallback
+        let agent;
+        try {
+            if (process.env.YOUTUBE_COOKIES) {
+                const cookies = JSON.parse(process.env.YOUTUBE_COOKIES);
+                agent = ytdl.createAgent(cookies);
+            } else {
+                agent = ytdl.createAgent();
+            }
+        } catch (e) {}
+
+        const options = {
+            ...(agent ? { agent } : {}),
+            requestOptions: {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                    'Accept-Language': 'en-US,en;q=0.9'
+                }
+            }
+        };
+
         const info = await ytdl.getInfo(videoUrl, options);
         
         let format = ytdl.chooseFormat(info.formats, { quality: 'highest', filter: 'audioandvideo' });
